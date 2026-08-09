@@ -23,10 +23,13 @@ class LumiNetworkClient(
     @Volatile var lastReceivedEventType = ""
 
     fun start() {
-        val url = if (coordinatorAddress.startsWith("ws://") || coordinatorAddress.startsWith("wss://")) {
-            coordinatorAddress
-        } else {
-            "ws://$coordinatorAddress"
+        var url = coordinatorAddress.trim()
+        if (url.startsWith("https://")) {
+            url = url.replace("https://", "wss://")
+        } else if (url.startsWith("http://")) {
+            url = url.replace("http://", "ws://")
+        } else if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
+            url = "wss://$url" // Default to secure WSS for Render/production compatibility
         }
 
         Log.d("LumiNetwork", "Connecting to WebSocket: $url")

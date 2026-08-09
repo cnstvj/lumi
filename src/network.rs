@@ -16,11 +16,14 @@ impl WebSocketTransport {
         event_sender: mpsc::Sender<LumiEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // Resolve WS/WSS URL schema
-        let url = if coordinator_addr.starts_with("ws://") || coordinator_addr.starts_with("wss://") {
-            coordinator_addr.to_string()
-        } else {
-            format!("ws://{}", coordinator_addr)
-        };
+        let mut url = coordinator_addr.trim().to_string();
+        if url.starts_with("https://") {
+            url = url.replace("https://", "wss://");
+        } else if url.starts_with("http://") {
+            url = url.replace("http://", "ws://");
+        } else if !url.starts_with("ws://") && !url.starts_with("wss://") {
+            url = format!("wss://{}", url); // Default to secure WSS for Render/production
+        }
 
         println!("[Network] Connecting to WebSocket relay at {}...", url);
         let (ws_stream, _) = tokio_tungstenite::connect_async(&url).await?;
