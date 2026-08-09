@@ -182,6 +182,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     *last = Some((now, timeline.position));
 
                                     if is_manual_seek {
+                                        // Deduplicate loopback echos from network commands
+                                        let elapsed_opt = {
+                                            let last_net = last_network_event_cb.lock().unwrap();
+                                            last_net.as_ref().map(|(time, ev)| (time.elapsed(), ev.clone()))
+                                        };
+                                        if let Some((elapsed, ev)) = elapsed_opt {
+                                            if ev == EventType::Seek && elapsed < std::time::Duration::from_secs(2) {
+                                                println!("[Bound Event] Ignoring feedback echo loop for Seek");
+                                                return;
+                                            }
+                                        }
+
                                         println!("[Bound Event] Manual seek detected! Syncing position: {:.1}s", timeline.position.as_secs_f64());
                                         let network_event = LumiEvent::new(
                                             EventType::Seek,

@@ -16,6 +16,11 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
+      if (data.action === 'ping') {
+        ws.send(JSON.stringify({ action: 'pong', timestamp: data.timestamp }));
+        return;
+      }
+
       if (data.action === 'join' && data.room) {
         currentRoom = data.room;
         if (!rooms.has(currentRoom)) {

@@ -17,6 +17,7 @@ class LumiNetworkClient(
 ) {
     private var webSocket: WebSocket? = null
     private val client = OkHttpClient()
+    private var pingTimer: java.util.Timer? = null
 
     // Track last received network events to prevent loopback/echo storms
     @Volatile var lastReceivedEventTime = 0L
@@ -49,12 +50,42 @@ class LumiNetworkClient(
                 webSocket.send(joinMsg.toString())
                 Log.d("LumiNetwork", "Sent join room action: $roomCode")
                 onStatusChanged("Connected (Room $roomCode)")
+
+                // Start ping loop to measure RTT every 10 seconds
+                pingTimer?.cancel()
+                pingTimer = java.util.Timer().apply {
+                    scheduleAtFixedRate(object : java.util.TimerTask() {
+                        override fun run() {
+                            try {
+                                val pingMsg = JSONObject().apply {
+                                    put("action", "ping")
+                                    put("timestamp", System.currentTimeMillis())
+                                }
+                                webSocket.send(pingMsg.toString())
+                            } catch (e: Exception) {
+                                Log.e("LumiNetwork", "Failed to send ping", e)
+                            }
+                        }
+                    }, 5000, 10000)
+                }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 Log.d("LumiNetwork", "Received: $text")
                 try {
                     val json = JSONObject(text)
+                    
+                    // Check for pong
+                    if (json.optString("action") == "pong") {
+                        val sentTime = json.optLong("timestamp", 0)
+                        if (sentTime > 0) {
+                            val rtt = System.currentTimeMillis() - sentTime
+                            Log.d("LumiNetwork", "RTT: $rtt ms")
+                            onStatusChanged("Connected (RTT: $rtt ms)")
+                        }
+                        return
+                    }
+
                     val eventType = json.getString("type")
                     val position = json.optDouble("position", 0.0)
 
@@ -69,11 +100,13 @@ class LumiNetworkClient(
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d("LumiNetwork", "Closing: $code / $reason")
+                pingTimer?.cancel()
                 onStatusChanged("Disconnected")
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e("LumiNetwork", "WebSocket Failure", t)
+                pingTimer?.cancel()
                 onStatusChanged("Failure: ${t.message}")
             }
         })
@@ -103,6 +136,8 @@ class LumiNetworkClient(
     }
 
     fun stop() {
+        pingTimer?.cancel()
+        pingTimer = null
         webSocket?.close(1000, "App closed")
         webSocket = null
         client.dispatcher.executorService.shutdown()

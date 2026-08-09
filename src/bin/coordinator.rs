@@ -42,6 +42,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             // Parse message to inspect for room joining
                             if let Ok(client_msg) = serde_json::from_str::<serde_json::Value>(&text) {
                                 if let Some(action) = client_msg.get("action").and_then(|v| v.as_str()) {
+                                    if action == "ping" {
+                                        let pong = serde_json::json!({
+                                            "action": "pong",
+                                            "timestamp": client_msg.get("timestamp")
+                                        });
+                                        let mut lock = tx_arc.lock().await;
+                                        let _ = lock.send(Message::Text(pong.to_string())).await;
+                                        continue;
+                                    }
                                     if action == "join" {
                                         if let Some(room_name) = client_msg.get("room").and_then(|v| v.as_str()) {
                                             let room_name = room_name.to_string();

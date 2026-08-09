@@ -41,10 +41,49 @@ impl WebSocketTransport {
 
         let ws_tx = Arc::new(Mutex::new(ws_tx));
 
+        // Spawn background ping loop to measure RTT
+        let ws_tx_clone = ws_tx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let ping = serde_json::json!({
+                    "action": "ping",
+                    "timestamp": timestamp
+                });
+                let mut lock = ws_tx_clone.lock().await;
+                if lock.send(Message::Text(ping.to_string())).await.is_err() {
+                    break;
+                }
+            }
+        });
+
         // Spawn read loop task
         tokio::spawn(async move {
             while let Some(Ok(msg)) = ws_rx.next().await {
                 if let Message::Text(text) = msg {
+                    // Check for pong response
+                    if let Ok(client_msg) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if let Some(action) = client_msg.get("action").and_then(|v| v.as_str()) {
+                            if action == "pong" {
+                                if let Some(sent_time) = client_msg.get("timestamp").and_then(|v| v.as_u64()) {
+                                    let now = std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_millis() as u64;
+                                    if now >= sent_time {
+                                        let rtt = now - sent_time;
+                                        println!("[Network] RTT: {} ms", rtt);
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+                    }
+
                     if let Ok(event) = serde_json::from_str::<LumiEvent>(&text) {
                         if event_sender.send(event).await.is_err() {
                             break; // channel closed
