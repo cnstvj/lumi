@@ -1,0 +1,12 @@
+app = "lumi-coordinator"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.coordinator"
+
+[[services]]
+  internal_port = 4000
+  protocol = "udp"
+
+  [[services.ports]]
+    port = 4000
