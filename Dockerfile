@@ -1,13 +1,7 @@
-# Build stage
-FROM rust:1.75-slim as builder
+FROM node:20-alpine
 WORKDIR /app
-COPY . .
-ENV CARGO_BUILD_JOBS=1
-RUN cargo build --release --bin coordinator
-
-# Run stage
-FROM debian:bookworm-slim
-WORKDIR /app
-COPY --from=builder /app/target/release/coordinator /app/coordinator
+COPY coordinator/package.json .
+RUN npm install --production
+COPY coordinator/server.js .
 EXPOSE 4000
-ENTRYPOINT ["/app/coordinator"]
+CMD ["node", "server.js"]

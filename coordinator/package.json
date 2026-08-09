@@ -1,0 +1,12 @@
+{
+  "name": "lumi-coordinator",
+  "version": "1.0.0",
+  "description": "Lumi WebSocket relay coordinator",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
