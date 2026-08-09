@@ -2,6 +2,7 @@
 FROM rust:1.75-slim as builder
 WORKDIR /app
 COPY . .
+ENV CARGO_BUILD_JOBS=1
 RUN cargo build --release --bin coordinator
 
 # Run stage
