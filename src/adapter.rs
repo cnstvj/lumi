@@ -28,4 +28,6 @@ pub trait MediaSession: Send + Sync {
     fn play(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn pause(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn seek(&self, position: Duration) -> Result<(), Box<dyn std::error::Error>>;
+    fn get_timeline_properties(&self) -> Result<TimelineProperties, Box<dyn std::error::Error>>;
+    fn set_playback_rate(&self, rate: f64) -> Result<(), Box<dyn std::error::Error>>;
 }

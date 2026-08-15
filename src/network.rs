@@ -25,9 +25,7 @@ impl WebSocketTransport {
             url = format!("wss://{}", url); // Default to secure WSS for Render/production
         }
 
-        println!("[Network] Connecting to WebSocket relay at {}...", url);
         let (ws_stream, _) = tokio_tungstenite::connect_async(&url).await?;
-        println!("[Network] Connected successfully!");
 
         let (mut ws_tx, mut ws_rx) = ws_stream.split();
 
@@ -37,7 +35,6 @@ impl WebSocketTransport {
             "room": room_code
         });
         ws_tx.send(Message::Text(join_payload.to_string())).await?;
-        println!("[Network] Joined room: {}", room_code);
 
         let ws_tx = Arc::new(Mutex::new(ws_tx));
 
@@ -69,16 +66,6 @@ impl WebSocketTransport {
                     if let Ok(client_msg) = serde_json::from_str::<serde_json::Value>(&text) {
                         if let Some(action) = client_msg.get("action").and_then(|v| v.as_str()) {
                             if action == "pong" {
-                                if let Some(sent_time) = client_msg.get("timestamp").and_then(|v| v.as_u64()) {
-                                    let now = std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_millis() as u64;
-                                    if now >= sent_time {
-                                        let rtt = now - sent_time;
-                                        println!("[Network] RTT: {} ms", rtt);
-                                    }
-                                }
                                 continue;
                             }
                         }
@@ -91,7 +78,6 @@ impl WebSocketTransport {
                     }
                 }
             }
-            println!("[Network] WebSocket connection closed by remote.");
         });
 
         Ok(Self { ws_tx })

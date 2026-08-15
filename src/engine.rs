@@ -227,6 +227,7 @@ fn is_streaming_platform(app_id: &str) -> bool {
         || lower.contains("hotstar")
 }
 
+#[allow(dead_code)]
 pub enum SessionEvent {
     PlaybackStatusChanged(String, PlaybackStatus),
     MetadataChanged(String, MediaMetadata),

@@ -13,36 +13,38 @@ class LumiNetworkClient(
     private val coordinatorAddress: String, // e.g. "127.0.0.1:4000" or "lumi.fly.dev"
     private val roomCode: String,
     private val onStatusChanged: (String) -> Unit,
-    private val onEventReceived: (String, Double) -> Unit // eventType, position
+    private val onRttMeasured: ((Long) -> Unit)? = null,
+    private val onRawEvent: ((String, String, String) -> Unit)? = null,
+    private val onEventReceived: (String, Double, Boolean, Long) -> Unit // eventType, position, playing, timestamp
 ) {
     private var webSocket: WebSocket? = null
     private val client = OkHttpClient()
     private var pingTimer: java.util.Timer? = null
 
-    // Track last received network events to prevent loopback/echo storms
-    @Volatile var lastReceivedEventTime = 0L
-    @Volatile var lastReceivedEventType = ""
+    var lastReceivedEventTime: Long = 0
+    var lastReceivedEventType: String? = null
 
     fun start() {
-        var url = coordinatorAddress.trim()
-        if (url.startsWith("https://")) {
-            url = url.replace("https://", "wss://")
-        } else if (url.startsWith("http://")) {
-            url = url.replace("http://", "ws://")
-        } else if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-            url = "wss://$url" // Default to secure WSS for Render/production compatibility
+        var cleanAddress = coordinatorAddress.trim()
+        if (cleanAddress.startsWith("http://")) {
+            cleanAddress = "ws://" + cleanAddress.substring(7)
+        } else if (cleanAddress.startsWith("https://")) {
+            cleanAddress = "wss://" + cleanAddress.substring(8)
+        } else if (!cleanAddress.startsWith("ws://") && !cleanAddress.startsWith("wss://")) {
+            cleanAddress = if (cleanAddress.contains("onrender.com")) "wss://$cleanAddress" else "ws://$cleanAddress"
         }
 
-        Log.d("LumiNetwork", "Connecting to WebSocket: $url")
+        val url = if (cleanAddress.contains("?")) cleanAddress else "$cleanAddress/"
+        Log.d("LumiNetwork", "Connecting to WebSocket URL: $url")
         onStatusChanged("Connecting...")
 
         val request = Request.Builder().url(url).build()
+
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d("LumiNetwork", "WebSocket Opened")
-                onStatusChanged("Connected")
+                Log.d("LumiNetwork", "Connected to coordinator")
+                onStatusChanged("Connected (Joining room...)")
 
-                // Join room
                 val joinMsg = JSONObject().apply {
                     put("action", "join")
                     put("room", roomCode)
@@ -82,17 +84,21 @@ class LumiNetworkClient(
                             val rtt = System.currentTimeMillis() - sentTime
                             Log.d("LumiNetwork", "RTT: $rtt ms")
                             onStatusChanged("Connected (RTT: $rtt ms)")
+                            onRttMeasured?.invoke(rtt)
                         }
                         return
                     }
 
                     val eventType = json.getString("type")
                     val position = json.optDouble("position", 0.0)
+                    val playing = json.optBoolean("playing", false)
+                    val timestamp = json.optLong("timestamp", System.currentTimeMillis())
 
                     lastReceivedEventTime = System.currentTimeMillis()
                     lastReceivedEventType = eventType
 
-                    onEventReceived(eventType, position)
+                    onRawEvent?.invoke("IN", eventType, text)
+                    onEventReceived(eventType, position, playing, timestamp)
                 } catch (e: Exception) {
                     Log.e("LumiNetwork", "Error parsing event text: $text", e)
                 }
@@ -112,7 +118,7 @@ class LumiNetworkClient(
         })
     }
 
-    fun sendEvent(eventType: String, position: Double) {
+    fun sendEvent(eventType: String, position: Double, playing: Boolean) {
         val ws = webSocket
         if (ws == null) {
             Log.e("LumiNetwork", "WebSocket is not connected.")
@@ -126,10 +132,12 @@ class LumiNetworkClient(
                 put("event_id", UUID.randomUUID().toString())
                 put("timestamp", System.currentTimeMillis())
                 put("position", position)
+                put("playing", playing)
             }
             val text = json.toString()
             ws.send(text)
             Log.d("LumiNetwork", "Sent event: $text")
+            onRawEvent?.invoke("OUT", eventType, text)
         } catch (e: Exception) {
             Log.e("LumiNetwork", "Failed to send event", e)
         }
