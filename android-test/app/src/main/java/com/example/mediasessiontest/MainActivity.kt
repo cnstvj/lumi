@@ -213,21 +213,9 @@ class MainActivity : ComponentActivity() {
                 private var lastStateUpdateTime = 0L
 
                 override fun onPlaybackStateChanged(state: PlaybackState?) {
-                    if (!isHost) return
                     state?.let {
                         val now = System.currentTimeMillis()
                         val currentPos = it.position
-
-                        if (it.state == lastState) {
-                            return
-                        }
-                        lastState = it.state
-
-                        val eventType = when (it.state) {
-                            PlaybackState.STATE_PLAYING -> "PLAY"
-                            PlaybackState.STATE_PAUSED -> "PAUSE"
-                            else -> null
-                        }
 
                         var isManualSeek = false
 
@@ -250,7 +238,22 @@ class MainActivity : ComponentActivity() {
                                 Log.d("LumiNetwork", "Broadcasting local phone seek: ${currentPos / 1000.0}")
                                 networkClient?.sendEvent("SEEK", currentPos / 1000.0, isPlaying)
                             }
-                        } else if (eventType != null) {
+                            lastState = it.state
+                            return
+                        }
+
+                        if (it.state == lastState) {
+                            return
+                        }
+                        lastState = it.state
+
+                        val eventType = when (it.state) {
+                            PlaybackState.STATE_PLAYING -> "PLAY"
+                            PlaybackState.STATE_PAUSED -> "PAUSE"
+                            else -> null
+                        }
+
+                        if (eventType != null) {
                             // Deduplicate loops if this was triggered by a recent network command
                             val client = networkClient
                             if (client != null) {
