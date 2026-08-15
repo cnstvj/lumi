@@ -1,13 +1,19 @@
 package com.example.mediasessiontest.ui
 
 import android.media.session.MediaController
+import android.media.session.PlaybackState
+import android.media.MediaMetadata
+import android.graphics.Bitmap
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,55 +23,57 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mediasessiontest.data.SyncStatus
-import com.example.mediasessiontest.data.TelemetryState
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserUiView(
-    coordinatorAddress: String,
-    onCoordinatorAddressChange: (String) -> Unit,
     roomCode: String,
     onRoomCodeChange: (String) -> Unit,
+    isJoined: Boolean,
+    onJoinChanged: (Boolean) -> Unit,
+    currentPing: Long,
+    coordinatorAddress: String,
+    isHost: Boolean,
     mediaControllers: List<MediaController>,
     selectedController: MediaController?,
     onSelectController: (MediaController) -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
-    onSeekBy: (Long) -> Unit,
-    telemetryState: TelemetryState,
-    onToggleMode: () -> Unit
+    onSeekBy: (Long) -> Unit
 ) {
     val darkBackground = Color(0xFF0F172A)
     val cardBackground = Color(0xFF1E293B)
     val accentColor = Color(0xFF6366F1)
     val emeraldColor = Color(0xFF10B981)
-    val amberColor = Color(0xFBF59E0B)
     val textPrimary = Color(0xFFF8FAFC)
     val textSecondary = Color(0xFF94A3B8)
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(darkBackground)
-            .padding(16.dp)
     ) {
-        // --- Top Bar ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        if (!isJoined) {
+            // --- JOIN ROOM SCREEN ---
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(80.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
@@ -75,285 +83,391 @@ fun UserUiView(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
+                        imageVector = Icons.Default.Share,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Text(
-                    text = "LUMI",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
+                    text = "LUMI SYNC",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 4.sp
                     ),
                     color = textPrimary
                 )
-            }
 
-            // Mode Selector Pill
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onToggleMode() },
-                color = cardBackground,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Synchronize media playback across all your devices.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBackground),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "User Mode",
-                        tint = accentColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "USER VIEW",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = textPrimary
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Switch",
-                        tint = textSecondary,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Enter Room Code",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = textPrimary
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = roomCode,
+                            onValueChange = onRoomCodeChange,
+                            placeholder = { Text("LUMI-XXXX") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary,
+                                focusedBorderColor = accentColor,
+                                unfocusedBorderColor = Color(0xFF334155)
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = { onJoinChanged(true) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                        ) {
+                            Text(
+                                "Join Room",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
-        }
+        } else {
+            // --- ROOM SCREEN (isJoined == true) ---
+            
+            // Extract OS Media Thumbnail for Background
+            val metadata = selectedController?.metadata
+            val artBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
 
-        Spacer(modifier = Modifier.height(12.dp))
+            if (artBitmap != null) {
+                Image(
+                    bitmap = artBitmap.asImageBitmap(),
+                    contentDescription = "Media Background Artwork",
+                    modifier = Modifier.fillMaxSize().alpha(0.12f),
+                    contentScale = ContentScale.Crop
+                )
+            }
 
-        // --- Room Connection Card ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = cardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Header Bar
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Sync Room",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = textPrimary
-                    )
-
-                    // Sync Status Badge
-                    val (statusColor, statusText) = when (telemetryState.syncStatus) {
-                        SyncStatus.SYNCED -> Pair(emeraldColor, "Synced")
-                        SyncStatus.CORRECTING_DRIFT -> Pair(amberColor, "Syncing...")
-                        SyncStatus.CONNECTING -> Pair(Color(0xFF3B82F6), "Connecting...")
-                        SyncStatus.DISCONNECTED -> Pair(Color(0xFFEF4444), "Offline")
+                    Column {
+                        Text(
+                            text = "LUMI ROOM",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp
+                            ),
+                            color = textPrimary
+                        )
+                        Text(
+                            text = roomCode,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = accentColor
+                        )
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(statusColor.copy(alpha = 0.15f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    Button(
+                        onClick = { onJoinChanged(false) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(statusColor)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = statusColor
-                        )
-                        if (telemetryState.currentRttMs > 0) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Text("Leave Room", color = Color.White)
+                    }
+                }
+
+                // Stats Dashboard Row
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBackground.copy(alpha = 0.85f))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("PING", style = MaterialTheme.typography.labelSmall, color = textSecondary)
+                            Text("${currentPing} ms", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = emeraldColor)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("HOST / IP", style = MaterialTheme.typography.labelSmall, color = textSecondary)
+                            val hostIp = coordinatorAddress.substringAfter("://").substringBefore("/")
+                            Text(hostIp, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("ROLE", style = MaterialTheme.typography.labelSmall, color = textSecondary)
                             Text(
-                                text = "⚡ ${telemetryState.currentRttMs}ms",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = textSecondary
+                                text = if (isHost) "HOST 👑" else "FOLLOWER 👥",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (isHost) emeraldColor else accentColor
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = coordinatorAddress,
-                    onValueChange = onCoordinatorAddressChange,
-                    label = { Text("Server URL", color = textSecondary) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = textPrimary,
-                        unfocusedTextColor = textPrimary,
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = Color(0xFF334155)
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = roomCode,
-                    onValueChange = onRoomCodeChange,
-                    label = { Text("Room Code", color = textSecondary) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = textPrimary,
-                        unfocusedTextColor = textPrimary,
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = Color(0xFF334155)
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- Active Media Player Card ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = cardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+                // Available Media Players list
                 Text(
-                    text = "Active Media Source",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = textSecondary
+                    text = "Select Active Media Player:",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = textPrimary
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (mediaControllers.isEmpty()) {
-                    Text(
-                        text = "No active media session found. Open YouTube, VLC, or Spotify.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFF59E0B),
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                } else {
-                    var expanded by remember { mutableStateOf(false) }
-                    val currentTitle = selectedController?.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Track"
-                    val currentArtist = selectedController?.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: selectedController?.packageName ?: "Unknown Artist"
-
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { expanded = true },
-                            color = Color(0xFF0F172A),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBackground.copy(alpha = 0.7f))
+                ) {
+                    if (mediaControllers.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No active media sessions detected.", color = textSecondary)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = accentColor,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = currentTitle,
-                                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = textPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                            items(mediaControllers) { controller ->
+                                val isSelected = selectedController?.packageName == controller.packageName
+                                val appName = controller.packageName.substringAfterLast(".")
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) accentColor.copy(alpha = 0.25f) else Color.Transparent)
+                                        .clickable { onSelectController(controller) }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = if (isSelected) accentColor else textSecondary
                                     )
+                                    Spacer(modifier = Modifier.width(12.dp))
                                     Text(
-                                        text = currentArtist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = textSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        text = appName.uppercase(),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isSelected) textPrimary else textSecondary
                                     )
                                 }
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Select App",
-                                    tint = textSecondary
-                                )
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            mediaControllers.forEach { controller ->
-                                val title = controller.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: controller.packageName
-                                DropdownMenuItem(
-                                    text = { Text(title) },
-                                    onClick = {
-                                        onSelectController(controller)
-                                        expanded = false
-                                    }
-                                )
                             }
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    // Media Control Buttons
-                    Row(
+                // --- CONTROLLER CARD AND SEEKBAR ---
+                if (selectedController != null) {
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardBackground.copy(alpha = 0.9f))
                     ) {
-                        Button(
-                            onClick = { onSeekBy(-10000L) },
-                            enabled = selectedController != null,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155))
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("-10s", color = textPrimary, fontWeight = FontWeight.Bold)
-                        }
+                            val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "No Title"
+                            val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
 
-                        val isPlaying = selectedController?.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING
-                        FloatingActionButton(
-                            onClick = {
-                                if (isPlaying) onPause() else onPlay()
-                            },
-                            containerColor = accentColor,
-                            contentColor = Color.White,
-                            shape = CircleShape,
-                            modifier = Modifier.size(64.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(36.dp)
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                        }
+                            Text(
+                                text = artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
 
-                        Button(
-                            onClick = { onSeekBy(10000L) },
-                            enabled = selectedController != null,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155))
-                        ) {
-                            Text("+10s", color = textPrimary, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Interactive Responsive Seekbar
+                            val state = selectedController.playbackState
+                            val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+                            
+                            // Track local dragging position
+                            var localSliderValue by remember { mutableStateOf(0f) }
+                            var isDragging by remember { mutableStateOf(false) }
+
+                            // Continuously query position to animate seekbar progress
+                            var currentPlaybackPosition by remember { mutableStateOf(0L) }
+                            LaunchedEffect(selectedController, state) {
+                                while (true) {
+                                    currentPlaybackPosition = selectedController.playbackState?.position ?: 0L
+                                    if (!isDragging) {
+                                        localSliderValue = currentPlaybackPosition.toFloat()
+                                    }
+                                    delay(500)
+                                }
+                            }
+
+                            Slider(
+                                value = localSliderValue,
+                                onValueChange = {
+                                    isDragging = true
+                                    localSliderValue = it
+                                },
+                                onValueChangeFinished = {
+                                    isDragging = false
+                                    selectedController.transportControls.seekTo(localSliderValue.toLong())
+                                },
+                                valueRange = 0f..(if (duration > 0) duration.toFloat() else 100f),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = accentColor,
+                                    activeTrackColor = accentColor,
+                                    inactiveTrackColor = Color(0xFF334155)
+                                )
+                            )
+
+                            // Playback Timers
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = formatDuration(localSliderValue.toLong()),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = textSecondary
+                                )
+                                Text(
+                                    text = formatDuration(duration),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = textSecondary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Large responsive play/pause buttons
+                            val isPlaying = state != null && state.state == PlaybackState.STATE_PLAYING
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { onSeekBy(-10000L) },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Rewind 10s",
+                                        tint = textPrimary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape)
+                                        .background(accentColor)
+                                        .clickable {
+                                            if (isPlaying) onPause() else onPlay()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPlaying) Icons.Default.Menu // pause icon or similar
+                                            else Icons.Default.PlayArrow,
+                                        contentDescription = if (isPlaying) "Pause" else "Play",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                IconButton(
+                                    onClick = { onSeekBy(10000L) },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow, // skip forward icon
+                                        contentDescription = "Forward 10s",
+                                        tint = textPrimary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardBackground.copy(alpha = 0.8f))
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("Please select a media player above to control.", color = textSecondary)
                         }
                     }
                 }
             }
         }
     }
+}
+
+private fun formatDuration(ms: Long): String {
+    val totalSec = ms / 1000
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return String.format("%02d:%02d", min, sec)
 }

@@ -23,6 +23,7 @@ pub struct TimelineProperties {
 pub trait MediaSession: Send + Sync {
     fn get_id(&self) -> String;
     fn get_source_app_id(&self) -> String;
+    #[allow(dead_code)]
     fn get_metadata(&self) -> Result<MediaMetadata, Box<dyn std::error::Error>>;
 
     fn play(&self) -> Result<(), Box<dyn std::error::Error>>;

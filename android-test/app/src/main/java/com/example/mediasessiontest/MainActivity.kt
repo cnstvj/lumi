@@ -69,12 +69,13 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun MainScreen() {
         var hasPermission by remember { mutableStateOf(false) }
-        var roomCode by remember { mutableStateOf("456") }
-        var coordinatorAddress by remember { mutableStateOf("wss://lumi-connector.onrender.com") }
+        var roomCode by remember { mutableStateOf(Constants.DEFAULT_ROOM_CODE) }
+        val coordinatorAddress = Constants.DEFAULT_COORDINATOR_URL
         var networkStatus by remember { mutableStateOf("Idle") }
+        var isHost by remember { mutableStateOf(false) }
+        var isJoined by remember { mutableStateOf(false) }
+        var currentPing by remember { mutableStateOf(0L) }
         val coroutineScope = rememberCoroutineScope()
-        val telemetryState = remember { com.example.mediasessiontest.data.TelemetryState() }
-
         var currentCallback by remember { mutableStateOf<MediaController.Callback?>(null) }
 
         // Check permission by attempting to fetch sessions
@@ -89,26 +90,35 @@ class MainActivity : ComponentActivity() {
         }
 
         // Initialize and connect WebSocket client
-        LaunchedEffect(coordinatorAddress, roomCode) {
+        LaunchedEffect(isJoined, coordinatorAddress, roomCode) {
+            if (!isJoined) {
+                networkClient?.stop()
+                networkClient = null
+                isHost = false
+                networkStatus = "Disconnected"
+                currentPing = 0L
+                return@LaunchedEffect
+            }
             networkClient?.stop()
             if (coordinatorAddress.isNotBlank() && roomCode.isNotBlank()) {
-                telemetryState.syncStatus = com.example.mediasessiontest.data.SyncStatus.CONNECTING
                 networkClient = LumiNetworkClient(
                     coordinatorAddress,
                     roomCode,
                     onStatusChanged = { status ->
                         networkStatus = status
-                        if (status.contains("Connected")) {
-                            telemetryState.syncStatus = com.example.mediasessiontest.data.SyncStatus.SYNCED
-                        } else if (status.contains("Disconnected") || status.contains("Failure")) {
-                            telemetryState.syncStatus = com.example.mediasessiontest.data.SyncStatus.DISCONNECTED
+                    },
+                    onHostStatusChanged = { host ->
+                        isHost = host
+                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                if (host) "You are now HOST" else "You are now FOLLOWER",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
-                    onRttMeasured = { rtt ->
-                        telemetryState.recordRtt(rtt)
-                    },
-                    onRawEvent = { direction, eventType, payload ->
-                        telemetryState.logEvent(direction, eventType, payload)
+                    onPingMeasured = { ping ->
+                        currentPing = ping
                     }
                 ) { eventType, position, targetPlaying, timestamp ->
                     val controller = selectedController
@@ -123,18 +133,14 @@ class MainActivity : ComponentActivity() {
                         val expectedRemotePos = if (targetPlaying) position + latency else position
                         val drift = localPos - expectedRemotePos
 
-                        telemetryState.recordDrift(drift)
-
                         if (eventType == "STATE") {
                             // STATE: soft drift correction ONLY (no play/pause/seek)
                             if (targetPlaying && localPlaying) {
                                 if (Math.abs(drift) > 0.250) {
-                                    telemetryState.syncStatus = com.example.mediasessiontest.data.SyncStatus.CORRECTING_DRIFT
                                     val targetRate = if (drift > 0) 0.95f else 1.05f
                                     Log.d("LumiSync", "Drift: ${drift}s -> speed $targetRate")
                                     controller.transportControls.setPlaybackSpeed(targetRate)
                                 } else if (Math.abs(drift) < 0.080) {
-                                    telemetryState.syncStatus = com.example.mediasessiontest.data.SyncStatus.SYNCED
                                     controller.transportControls.setPlaybackSpeed(1.0f)
                                 }
                             }
@@ -165,13 +171,30 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner, networkClient) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    val client = networkClient
+                    if (client != null && !networkStatus.contains("Connected")) {
+                        Log.d("LumiLifecycle", "App resumed. Proactively triggering reconnect.")
+                        client.start()
+                    }
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+
         // Periodic state sender coroutine on Android (every 5 seconds)
-        LaunchedEffect(selectedController, networkClient) {
+        LaunchedEffect(selectedController, networkClient, isHost) {
             while (true) {
                 kotlinx.coroutines.delay(5000)
                 val controller = selectedController
                 val client = networkClient
-                if (controller != null && client != null) {
+                if (controller != null && client != null && isHost) {
                     val state = controller.playbackState
                     if (state != null && state.state == PlaybackState.STATE_PLAYING) {
                         val currentPos = state.position
@@ -182,7 +205,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Handle auto-broadcasting of local OS media session changes
-        LaunchedEffect(selectedController, networkClient) {
+        LaunchedEffect(selectedController, networkClient, isHost) {
             currentCallback?.let { selectedController?.unregisterCallback(it) }
             val callback = object : MediaController.Callback() {
                 private var lastState = PlaybackState.STATE_NONE
@@ -190,6 +213,7 @@ class MainActivity : ComponentActivity() {
                 private var lastStateUpdateTime = 0L
 
                 override fun onPlaybackStateChanged(state: PlaybackState?) {
+                    if (!isHost) return
                     state?.let {
                         val now = System.currentTimeMillis()
                         val currentPos = it.position
@@ -266,70 +290,45 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } else {
-            val onToggleMode = {
-                telemetryState.uiMode = if (telemetryState.uiMode == com.example.mediasessiontest.data.UiMode.USER) {
-                    com.example.mediasessiontest.data.UiMode.DEVELOPER
-                } else {
-                    com.example.mediasessiontest.data.UiMode.USER
+            com.example.mediasessiontest.ui.UserUiView(
+                roomCode = roomCode,
+                onRoomCodeChange = { roomCode = it },
+                isJoined = isJoined,
+                onJoinChanged = { isJoined = it },
+                currentPing = currentPing,
+                coordinatorAddress = coordinatorAddress,
+                isHost = isHost,
+                mediaControllers = activeControllers,
+                selectedController = selectedController,
+                onSelectController = { selectedController = it },
+                onPlay = {
+                    val currentPos = selectedController?.playbackState?.position ?: 0L
+                    selectedController?.transportControls?.play()
+                    coroutineScope.launch {
+                        networkClient?.lastReceivedEventType = "PLAY"
+                        networkClient?.lastReceivedEventTime = System.currentTimeMillis()
+                        networkClient?.sendEvent("PLAY", currentPos / 1000.0, true)
+                    }
+                },
+                onPause = {
+                    val currentPos = selectedController?.playbackState?.position ?: 0L
+                    selectedController?.transportControls?.pause()
+                    coroutineScope.launch {
+                        networkClient?.lastReceivedEventType = "PAUSE"
+                        networkClient?.lastReceivedEventTime = System.currentTimeMillis()
+                        networkClient?.sendEvent("PAUSE", currentPos / 1000.0, false)
+                    }
+                },
+                onSeekBy = { deltaMs ->
+                    val currentPos = selectedController?.playbackState?.position ?: 0L
+                    val newPos = (currentPos + deltaMs).coerceAtLeast(0L)
+                    val isPlaying = selectedController?.playbackState?.state == PlaybackState.STATE_PLAYING
+                    selectedController?.transportControls?.seekTo(newPos)
+                    coroutineScope.launch {
+                        networkClient?.sendEvent("SEEK", newPos / 1000.0, isPlaying)
+                    }
                 }
-            }
-
-            val onInjectDrift: (Double) -> Unit = { offsetSeconds ->
-                val controller = selectedController
-                if (controller != null) {
-                    val currentPos = controller.playbackState?.position ?: 0L
-                    val targetPos = ((currentPos / 1000.0) + offsetSeconds).coerceAtLeast(0.0)
-                    controller.transportControls.seekTo((targetPos * 1000).toLong())
-                }
-            }
-
-            if (telemetryState.uiMode == com.example.mediasessiontest.data.UiMode.USER) {
-                com.example.mediasessiontest.ui.UserUiView(
-                    coordinatorAddress = coordinatorAddress,
-                    onCoordinatorAddressChange = { coordinatorAddress = it },
-                    roomCode = roomCode,
-                    onRoomCodeChange = { roomCode = it },
-                    mediaControllers = activeControllers,
-                    selectedController = selectedController,
-                    onSelectController = { selectedController = it },
-                    onPlay = {
-                        val currentPos = selectedController?.playbackState?.position ?: 0L
-                        selectedController?.transportControls?.play()
-                        coroutineScope.launch {
-                            networkClient?.lastReceivedEventType = "PLAY"
-                            networkClient?.lastReceivedEventTime = System.currentTimeMillis()
-                            networkClient?.sendEvent("PLAY", currentPos / 1000.0, true)
-                        }
-                    },
-                    onPause = {
-                        val currentPos = selectedController?.playbackState?.position ?: 0L
-                        selectedController?.transportControls?.pause()
-                        coroutineScope.launch {
-                            networkClient?.lastReceivedEventType = "PAUSE"
-                            networkClient?.lastReceivedEventTime = System.currentTimeMillis()
-                            networkClient?.sendEvent("PAUSE", currentPos / 1000.0, false)
-                        }
-                    },
-                    onSeekBy = { deltaMs ->
-                        val currentPos = selectedController?.playbackState?.position ?: 0L
-                        val newPos = (currentPos + deltaMs).coerceAtLeast(0L)
-                        val isPlaying = selectedController?.playbackState?.state == PlaybackState.STATE_PLAYING
-                        selectedController?.transportControls?.seekTo(newPos)
-                        coroutineScope.launch {
-                            networkClient?.sendEvent("SEEK", newPos / 1000.0, isPlaying)
-                        }
-                    },
-                    telemetryState = telemetryState,
-                    onToggleMode = onToggleMode
-                )
-            } else {
-                com.example.mediasessiontest.ui.DeveloperUiView(
-                    telemetryState = telemetryState,
-                    selectedController = selectedController,
-                    onInjectDrift = onInjectDrift,
-                    onToggleMode = onToggleMode
-                )
-            }
+            )
         }
     }
 }

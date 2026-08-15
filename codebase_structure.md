@@ -10,7 +10,9 @@ This document outlines the modularized structure and entire source code referenc
 c:/PVR/lumi/
 ├── Cargo.toml
 ├── src/
-│   ├── main.rs            # Application entrypoint & CLI menu loop
+│   ├── main.rs            # Application entrypoint & GUI app boots
+│   ├── constants.rs       # Central application config & threshold constants
+│   ├── gui.rs             # egui/eframe GUI implementation (User controls and settings)
 │   ├── adapter.rs         # Abstract Trait defining media session interfaces
 │   ├── windows_adapter.rs # Concrete implementation of MediaSession using Windows SDK
 │   ├── engine.rs          # Manages sessions & coordinates OS media events
@@ -25,7 +27,10 @@ c:/PVR/lumi/
 ## Module Breakdown
 
 ### 1. [main.rs](file:///c:/PVR/lumi/src/main.rs)
-Bootstraps the CLI engine, initializes tokio tasks, connects to the WebSocket coordinator, and runs the user menu loop to list, select, bind to, and control media sessions.
+Bootstraps the GUI application thread and spawns the native `eframe` window.
+
+### 1b. [gui.rs](file:///c:/PVR/lumi/src/gui.rs)
+Builds the instant-mode Graphical User Interface, manages connection parameters, binds to media sessions, and presents Host/Follower playback controls.
 
 ### 2. [adapter.rs](file:///c:/PVR/lumi/src/adapter.rs)
 Defines abstract data types (`PlaybackStatus`, `MediaMetadata`, `TimelineProperties`) and the core `MediaSession` trait that wraps underlying OS APIs.

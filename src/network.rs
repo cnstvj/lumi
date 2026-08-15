@@ -14,6 +14,7 @@ impl WebSocketTransport {
         coordinator_addr: &str,
         room_code: &str,
         event_sender: mpsc::Sender<LumiEvent>,
+        on_host_status: impl Fn(bool) + Send + Sync + 'static,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // Resolve WS/WSS URL schema
         let mut url = coordinator_addr.trim().to_string();
@@ -29,10 +30,12 @@ impl WebSocketTransport {
 
         let (mut ws_tx, mut ws_rx) = ws_stream.split();
 
-        // Send JOIN room handshake frame immediately
+        let digits = room_code.chars().filter(|c| c.is_ascii_digit()).collect::<String>();
+        let parsed_room = digits.parse::<i32>().map(|n| n.to_string()).unwrap_or_else(|_| room_code.to_string());
+
         let join_payload = serde_json::json!({
             "action": "join",
-            "room": room_code
+            "room": parsed_room
         });
         ws_tx.send(Message::Text(join_payload.to_string())).await?;
 
@@ -62,10 +65,16 @@ impl WebSocketTransport {
         tokio::spawn(async move {
             while let Some(Ok(msg)) = ws_rx.next().await {
                 if let Message::Text(text) = msg {
-                    // Check for pong response
+                    // Check for pong and host_status response
                     if let Ok(client_msg) = serde_json::from_str::<serde_json::Value>(&text) {
                         if let Some(action) = client_msg.get("action").and_then(|v| v.as_str()) {
                             if action == "pong" {
+                                continue;
+                            }
+                            if action == "host_status" {
+                                if let Some(is_host) = client_msg.get("is_host").and_then(|v| v.as_bool()) {
+                                    on_host_status(is_host);
+                                }
                                 continue;
                             }
                         }

@@ -75,7 +75,7 @@ impl SyncEngine {
                 if event.event_type == EventType::State {
                     // STATE events: soft drift correction ONLY (no play/pause/seek)
                     if target_playing && local_playing {
-                        if drift.abs() > 0.250 {
+                        if drift.abs() > crate::constants::DRIFT_CORRECTION_THRESHOLD_SEC {
                             let target_rate = if drift > 0.0 { 0.95 } else { 1.05 };
                             let _ = session.set_playback_rate(target_rate);
                         } else if drift.abs() < 0.080 {
@@ -92,7 +92,7 @@ impl SyncEngine {
                         }
                     }
 
-                    if drift.abs() > 1.5 {
+                    if drift.abs() > crate::constants::DRIFT_SEEK_THRESHOLD_SEC {
                         let _ = session.seek(Duration::from_secs_f64(expected_remote_pos));
                     }
                 }

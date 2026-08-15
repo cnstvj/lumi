@@ -24,10 +24,13 @@ wss.on('connection', (ws) => {
       if (data.action === 'join' && data.room) {
         currentRoom = data.room;
         if (!rooms.has(currentRoom)) {
-          rooms.set(currentRoom, new Set());
+          rooms.set(currentRoom, []);
         }
-        rooms.get(currentRoom).add(ws);
-        console.log(`Device joined room: ${currentRoom} (${rooms.get(currentRoom).size} peers)`);
+        const peers = rooms.get(currentRoom);
+        peers.push(ws);
+
+        const isHost = peers.length === 1;
+        ws.send(JSON.stringify({ action: 'host_status', is_host: isHost }));
         return;
       }
 
@@ -40,15 +43,25 @@ wss.on('connection', (ws) => {
         }
       }
     } catch (e) {
-      console.error('Error handling message:', e);
     }
   });
 
   ws.on('close', () => {
     if (currentRoom && rooms.has(currentRoom)) {
-      rooms.get(currentRoom).delete(ws);
-      console.log(`Device left room: ${currentRoom}`);
-      if (rooms.get(currentRoom).size === 0) {
+      const peers = rooms.get(currentRoom);
+      const index = peers.indexOf(ws);
+      if (index !== -1) {
+        peers.splice(index, 1);
+        
+        if (index === 0 && peers.length > 0) {
+          const newHost = peers[0];
+          if (newHost.readyState === newHost.OPEN) {
+            newHost.send(JSON.stringify({ action: 'host_status', is_host: true }));
+          }
+        }
+      }
+
+      if (peers.length === 0) {
         rooms.delete(currentRoom);
       }
     }
@@ -56,6 +69,4 @@ wss.on('connection', (ws) => {
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`Lumi WebSocket Coordinator listening on port ${PORT}`);
-});
+server.listen(PORT);

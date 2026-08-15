@@ -6,10 +6,13 @@ use crate::engine::Engine;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, Duration};
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 pub fn create_session_handler(
     engine: Arc<Engine>,
     transport: Arc<WebSocketTransport>,
     last_network_event: Arc<Mutex<Option<(Instant, EventType)>>>,
+    is_host: Arc<AtomicBool>,
 ) -> impl Fn(SessionEvent) + Send + Sync + 'static {
     let last_timeline = Arc::new(Mutex::new(None::<(Instant, Duration)>));
     let last_state_send_time = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(5)));
@@ -80,7 +83,7 @@ pub fn create_session_handler(
                     false
                 };
 
-                if is_playing {
+                if is_playing && is_host.load(Ordering::Relaxed) {
                     let mut last_send = last_state_send_time.lock().unwrap();
                     if now.duration_since(*last_send) >= Duration::from_secs(5) {
                         *last_send = now;

@@ -134,3 +134,38 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# --- Rust / Cargo ---
+/target/
+/target2/
+/target3/
+/lumi_release_target/
+Cargo.lock
+**/*.rs.bk
+
+# --- Android Build Ignored Files ---
+/android-test/.gradle/
+/android-test/.kotlin/
+/android-test/app/build/
+/android-test/build/
+/android-test/local.properties
+/android-test/.navigation/
+/android-test/captures/
+.gradle/
+build/
+local.properties
+
+# --- Binary and Executable Outputs ---
+*.exe
+*.apk
+*.o
+*.obj
+*.pdb
+*.class
+*.dex
+
+# --- IDEs and temporary files ---
+.idea/
+.vscode/
+*.iml
+*.log

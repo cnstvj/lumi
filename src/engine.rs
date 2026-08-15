@@ -198,6 +198,7 @@ impl Engine {
         self.active_session.clone()
     }
 
+    #[allow(dead_code)]
     pub fn on_sessions_changed<F>(&self, on_changed: F) -> Result<(), Box<dyn std::error::Error>>
     where
         F: Fn() + Send + Sync + 'static,
