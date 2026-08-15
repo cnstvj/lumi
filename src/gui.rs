@@ -149,25 +149,20 @@ impl eframe::App for LumiApp {
 
         // Main Panel Content
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Role Tag Card (Host vs Follower status bar)
-            let is_host = self.is_host.load(Ordering::Relaxed);
             let is_connected = self.transport.lock().unwrap().is_some();
             
             if is_connected {
-                let (role_text, bg_color) = if is_host {
-                    ("YOU ARE HOST 👑 (Broadcasting Timeline)", egui::Color32::from_rgb(16, 185, 129))
-                } else {
-                    ("YOU ARE FOLLOWER 👥 (Syncing to Host)", egui::Color32::from_rgb(59, 130, 246))
-                };
+                let status_text = format!("CONNECTED TO ROOM: {}", self.room_input);
+                let theme_color = egui::Color32::from_rgb(99, 102, 241); // Accent indigo
                 
                 egui::Frame::none()
-                    .fill(bg_color.linear_multiply(0.1))
-                    .stroke(egui::Stroke::new(1.0, bg_color))
+                    .fill(theme_color.linear_multiply(0.1))
+                    .stroke(egui::Stroke::new(1.0, theme_color))
                     .rounding(6.0)
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.vertical_centered(|ui| {
-                            ui.colored_label(bg_color, role_text);
+                            ui.colored_label(theme_color, status_text);
                         });
                     });
                 ui.add_space(8.0);
@@ -252,17 +247,10 @@ impl eframe::App for LumiApp {
                             ui.heading(format!("Playback Controls ({})", session.get_source_app_id()));
                             ui.add_space(4.0);
 
-                            if !is_host && is_connected {
-                                ui.colored_label(
-                                    egui::Color32::from_rgb(245, 158, 11),
-                                    "⚠️ You are a Follower. Actions here will only apply locally and won't broadcast."
-                                );
-                            }
-
-                            ui.horizontal(|ui| {
+                             ui.horizontal(|ui| {
                                 if ui.button("▶ Play").clicked() {
                                     let pos = session.get_timeline_properties().map(|p| p.position.as_secs_f64()).unwrap_or(0.0);
-                                    if session.play().is_ok() && is_host {
+                                    if session.play().is_ok() {
                                         let transport_opt = self.transport.lock().unwrap().clone();
                                         if let Some(transport) = transport_opt {
                                             let event = LumiEvent::new(EventType::Play, "windows-device-1", pos, Some(true));
@@ -275,7 +263,7 @@ impl eframe::App for LumiApp {
 
                                 if ui.button("⏸ Pause").clicked() {
                                     let pos = session.get_timeline_properties().map(|p| p.position.as_secs_f64()).unwrap_or(0.0);
-                                    if session.pause().is_ok() && is_host {
+                                    if session.pause().is_ok() {
                                         let transport_opt = self.transport.lock().unwrap().clone();
                                         if let Some(transport) = transport_opt {
                                             let event = LumiEvent::new(EventType::Pause, "windows-device-1", pos, Some(false));
@@ -294,7 +282,7 @@ impl eframe::App for LumiApp {
                                 ui.horizontal(|ui| {
                                     ui.label("Position: ");
                                     if ui.add(egui::Slider::new(&mut current_pos, 0.0..=duration).text("s")).changed() {
-                                        if session.seek(Duration::from_secs_f64(current_pos)).is_ok() && is_host {
+                                        if session.seek(Duration::from_secs_f64(current_pos)).is_ok() {
                                             let transport_opt = self.transport.lock().unwrap().clone();
                                             if let Some(transport) = transport_opt {
                                                 let is_playing = if let Ok(info) = session.get_raw().GetPlaybackInfo() {

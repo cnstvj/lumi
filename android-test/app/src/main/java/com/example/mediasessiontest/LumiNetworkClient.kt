@@ -59,6 +59,7 @@ class LumiNetworkClient(
                 val joinMsg = JSONObject().apply {
                     put("action", "join")
                     put("room", parsedRoom)
+                    put("device_id", Constants.DEVICE_ID)
                 }
                 webSocket.send(joinMsg.toString())
                 Log.d("LumiNetwork", "Sent join room action: $parsedRoom")

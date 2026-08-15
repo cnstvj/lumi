@@ -105,7 +105,11 @@ pub fn create_session_handler(
 
                 if let Some((last_time, last_pos)) = *last {
                     let elapsed = now.duration_since(last_time);
-                    let expected_pos = last_pos + elapsed;
+                    let expected_pos = if is_playing {
+                        last_pos + elapsed
+                    } else {
+                        last_pos
+                    };
                     let diff = if timeline.position > expected_pos {
                         timeline.position - expected_pos
                     } else {

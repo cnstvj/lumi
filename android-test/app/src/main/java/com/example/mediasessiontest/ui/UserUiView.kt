@@ -232,17 +232,9 @@ fun UserUiView(
                             Text("${currentPing} ms", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = emeraldColor)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("HOST / IP", style = MaterialTheme.typography.labelSmall, color = textSecondary)
+                            Text("COORDINATOR", style = MaterialTheme.typography.labelSmall, color = textSecondary)
                             val hostIp = coordinatorAddress.substringAfter("://").substringBefore("/")
                             Text(hostIp, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("ROLE", style = MaterialTheme.typography.labelSmall, color = textSecondary)
-                            Text(
-                                text = if (isHost) "HOST 👑" else "FOLLOWER 👥",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isHost) emeraldColor else accentColor
-                            )
                         }
                     }
                 }

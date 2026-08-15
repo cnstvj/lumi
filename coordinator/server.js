@@ -23,6 +23,7 @@ wss.on('connection', (ws) => {
 
       if (data.action === 'join' && data.room) {
         currentRoom = data.room;
+        ws.deviceId = data.device_id || 'unknown';
         if (!rooms.has(currentRoom)) {
           rooms.set(currentRoom, []);
         }

@@ -35,7 +35,8 @@ impl WebSocketTransport {
 
         let join_payload = serde_json::json!({
             "action": "join",
-            "room": parsed_room
+            "room": parsed_room,
+            "device_id": crate::constants::DEVICE_ID
         });
         ws_tx.send(Message::Text(join_payload.to_string())).await?;
 

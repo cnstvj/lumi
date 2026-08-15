@@ -109,13 +109,6 @@ class MainActivity : ComponentActivity() {
                     },
                     onHostStatusChanged = { host ->
                         isHost = host
-                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                            Toast.makeText(
-                                this@MainActivity,
-                                if (host) "You are now HOST" else "You are now FOLLOWER",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
                     },
                     onPingMeasured = { ping ->
                         currentPing = ping
