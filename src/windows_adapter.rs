@@ -52,6 +52,16 @@ impl MediaSession for WindowsMediaSession {
         Ok(())
     }
 
+    fn next(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.session.TrySkipNextAsync()?.get()?;
+        Ok(())
+    }
+
+    fn previous(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.session.TrySkipPreviousAsync()?.get()?;
+        Ok(())
+    }
+
     fn get_timeline_properties(&self) -> Result<TimelineProperties, Box<dyn std::error::Error>> {
         let timeline = self.session.GetTimelineProperties()?;
         let pos = timeline.Position()?;

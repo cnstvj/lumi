@@ -248,12 +248,24 @@ impl eframe::App for LumiApp {
                             ui.add_space(4.0);
 
                              ui.horizontal(|ui| {
-                                if ui.button("▶ Play").clicked() {
+                                 if ui.button("⏮ Prev").clicked() {
+                                     if session.previous().is_ok() {
+                                         let transport_opt = self.transport.lock().unwrap().clone();
+                                         if let Some(transport) = transport_opt {
+                                             let event = LumiEvent::new(EventType::Previous, crate::constants::DEVICE_ID, 0.0, Some(true));
+                                             tokio::spawn(async move {
+                                                 let _ = transport.send_event(&event).await;
+                                             });
+                                         }
+                                     }
+                                 }
+
+                                 if ui.button("▶ Play").clicked() {
                                     let pos = session.get_timeline_properties().map(|p| p.position.as_secs_f64()).unwrap_or(0.0);
                                     if session.play().is_ok() {
                                         let transport_opt = self.transport.lock().unwrap().clone();
                                         if let Some(transport) = transport_opt {
-                                            let event = LumiEvent::new(EventType::Play, "windows-device-1", pos, Some(true));
+                                            let event = LumiEvent::new(EventType::Play, crate::constants::DEVICE_ID, pos, Some(true));
                                             tokio::spawn(async move {
                                                 let _ = transport.send_event(&event).await;
                                             });
@@ -266,14 +278,26 @@ impl eframe::App for LumiApp {
                                     if session.pause().is_ok() {
                                         let transport_opt = self.transport.lock().unwrap().clone();
                                         if let Some(transport) = transport_opt {
-                                            let event = LumiEvent::new(EventType::Pause, "windows-device-1", pos, Some(false));
+                                            let event = LumiEvent::new(EventType::Pause, crate::constants::DEVICE_ID, pos, Some(false));
                                             tokio::spawn(async move {
                                                 let _ = transport.send_event(&event).await;
                                             });
                                         }
                                     }
                                 }
-                            });
+
+                                 if ui.button("⏭ Next").clicked() {
+                                     if session.next().is_ok() {
+                                         let transport_opt = self.transport.lock().unwrap().clone();
+                                         if let Some(transport) = transport_opt {
+                                             let event = LumiEvent::new(EventType::Next, crate::constants::DEVICE_ID, 0.0, Some(true));
+                                             tokio::spawn(async move {
+                                                 let _ = transport.send_event(&event).await;
+                                             });
+                                         }
+                                     }
+                                 }
+                             });
 
                             if let Ok(timeline) = session.get_timeline_properties() {
                                 let mut current_pos = timeline.position.as_secs_f64();

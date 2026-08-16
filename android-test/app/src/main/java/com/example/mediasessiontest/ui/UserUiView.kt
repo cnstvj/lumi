@@ -48,7 +48,9 @@ fun UserUiView(
     onSelectController: (MediaController) -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
-    onSeekBy: (Long) -> Unit
+    onSeekBy: (Long) -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit
 ) {
     val darkBackground = Color(0xFF0F172A)
     val cardBackground = Color(0xFF1E293B)
@@ -387,58 +389,86 @@ fun UserUiView(
 
                             // Large responsive play/pause buttons
                             val isPlaying = state != null && state.state == PlaybackState.STATE_PLAYING
-                            Row(
+                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(
-                                    onClick = { onSeekBy(-10000L) },
-                                    modifier = Modifier.size(48.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Rewind 10s",
-                                        tint = textPrimary,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
+                             ) {
+                                 IconButton(
+                                     onClick = onSkipPrevious,
+                                     modifier = Modifier.size(48.dp)
+                                 ) {
+                                     Icon(
+                                         imageVector = Icons.Default.KeyboardArrowLeft,
+                                         contentDescription = "Skip Previous",
+                                         tint = textPrimary,
+                                         modifier = Modifier.size(28.dp)
+                                     )
+                                 }
 
-                                Spacer(modifier = Modifier.width(16.dp))
+                                 Spacer(modifier = Modifier.width(8.dp))
 
-                                Box(
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .clip(CircleShape)
-                                        .background(accentColor)
-                                        .clickable {
-                                            if (isPlaying) onPause() else onPlay()
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = if (isPlaying) Icons.Default.Menu // pause icon or similar
-                                            else Icons.Default.PlayArrow,
-                                        contentDescription = if (isPlaying) "Pause" else "Play",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
+                                 IconButton(
+                                     onClick = { onSeekBy(-10000L) },
+                                     modifier = Modifier.size(48.dp)
+                                 ) {
+                                     Icon(
+                                         imageVector = Icons.Default.Refresh,
+                                         contentDescription = "Rewind 10s",
+                                         tint = textPrimary,
+                                         modifier = Modifier.size(28.dp)
+                                     )
+                                 }
 
-                                Spacer(modifier = Modifier.width(16.dp))
+                                 Spacer(modifier = Modifier.width(12.dp))
 
-                                IconButton(
-                                    onClick = { onSeekBy(10000L) },
-                                    modifier = Modifier.size(48.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow, // skip forward icon
-                                        contentDescription = "Forward 10s",
-                                        tint = textPrimary,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-                            }
+                                 Box(
+                                     modifier = Modifier
+                                         .size(64.dp)
+                                         .clip(CircleShape)
+                                         .background(accentColor)
+                                         .clickable {
+                                             if (isPlaying) onPause() else onPlay()
+                                         },
+                                     contentAlignment = Alignment.Center
+                                 ) {
+                                     Icon(
+                                         imageVector = if (isPlaying) Icons.Default.Menu
+                                             else Icons.Default.PlayArrow,
+                                         contentDescription = if (isPlaying) "Pause" else "Play",
+                                         tint = Color.White,
+                                         modifier = Modifier.size(32.dp)
+                                     )
+                                 }
+
+                                 Spacer(modifier = Modifier.width(12.dp))
+
+                                 IconButton(
+                                     onClick = { onSeekBy(10000L) },
+                                     modifier = Modifier.size(48.dp)
+                                 ) {
+                                     Icon(
+                                         imageVector = Icons.Default.PlayArrow,
+                                         contentDescription = "Forward 10s",
+                                         tint = textPrimary,
+                                         modifier = Modifier.size(28.dp)
+                                     )
+                                 }
+
+                                 Spacer(modifier = Modifier.width(8.dp))
+
+                                 IconButton(
+                                     onClick = onSkipNext,
+                                     modifier = Modifier.size(48.dp)
+                                 ) {
+                                     Icon(
+                                         imageVector = Icons.Default.KeyboardArrowRight,
+                                         contentDescription = "Skip Next",
+                                         tint = textPrimary,
+                                         modifier = Modifier.size(28.dp)
+                                     )
+                                 }
+                             }
                         }
                     }
                 } else {

@@ -137,6 +137,12 @@ class MainActivity : ComponentActivity() {
                                     controller.transportControls.setPlaybackSpeed(1.0f)
                                 }
                             }
+                        } else if (eventType == "NEXT") {
+                            Log.d("LumiSync", "Syncing state -> NEXT")
+                            controller.transportControls.skipToNext()
+                        } else if (eventType == "PREVIOUS") {
+                            Log.d("LumiSync", "Syncing state -> PREVIOUS")
+                            controller.transportControls.skipToPrevious()
                         } else {
                             // Explicit commands (PLAY, PAUSE, SEEK): apply state + position
                             if (targetPlaying != localPlaying) {
@@ -226,6 +232,15 @@ class MainActivity : ComponentActivity() {
                         lastStateUpdateTime = now
 
                         if (isManualSeek) {
+                            val client = networkClient
+                            if (client != null) {
+                                val elapsed = System.currentTimeMillis() - client.lastReceivedEventTime
+                                if (elapsed < 2000) {
+                                    Log.d("LumiNetwork", "Ignoring echo seek event")
+                                    lastState = it.state
+                                    return
+                                }
+                            }
                             coroutineScope.launch {
                                 val isPlaying = it.state == PlaybackState.STATE_PLAYING
                                 Log.d("LumiNetwork", "Broadcasting local phone seek: ${currentPos / 1000.0}")
@@ -251,7 +266,7 @@ class MainActivity : ComponentActivity() {
                             val client = networkClient
                             if (client != null) {
                                 val elapsed = System.currentTimeMillis() - client.lastReceivedEventTime
-                                if (eventType == client.lastReceivedEventType && elapsed < 2000) {
+                                if (elapsed < 2000) {
                                     Log.d("LumiNetwork", "Ignoring echo event: $eventType")
                                     return
                                 }
@@ -322,6 +337,18 @@ class MainActivity : ComponentActivity() {
                     selectedController?.transportControls?.seekTo(newPos)
                     coroutineScope.launch {
                         networkClient?.sendEvent("SEEK", newPos / 1000.0, isPlaying)
+                    }
+                },
+                onSkipNext = {
+                    selectedController?.transportControls?.skipToNext()
+                    coroutineScope.launch {
+                        networkClient?.sendEvent("NEXT", 0.0, true)
+                    }
+                },
+                onSkipPrevious = {
+                    selectedController?.transportControls?.skipToPrevious()
+                    coroutineScope.launch {
+                        networkClient?.sendEvent("PREVIOUS", 0.0, true)
                     }
                 }
             )

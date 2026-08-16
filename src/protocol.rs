@@ -12,6 +12,10 @@ pub enum EventType {
     Seek,
     #[serde(rename = "STATE")]
     State,
+    #[serde(rename = "NEXT")]
+    Next,
+    #[serde(rename = "PREVIOUS")]
+    Previous,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

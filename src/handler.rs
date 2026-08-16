@@ -44,10 +44,10 @@ pub fn create_session_handler(
                 // Deduplicate loopback echos from network commands
                 let elapsed_opt = {
                     let last = last_network_event.lock().unwrap();
-                    last.as_ref().map(|(time, ev)| (time.elapsed(), ev.clone()))
+                    last.as_ref().map(|(time, _ev)| time.elapsed())
                 };
-                if let Some((elapsed, ev)) = elapsed_opt {
-                    if ev == event_type && elapsed < Duration::from_secs(2) {
+                if let Some(elapsed) = elapsed_opt {
+                    if elapsed < Duration::from_secs(2) {
                         return;
                     }
                 }
@@ -126,10 +126,10 @@ pub fn create_session_handler(
                     // Deduplicate loopback echos from network commands
                     let elapsed_opt = {
                         let last_net = last_network_event.lock().unwrap();
-                        last_net.as_ref().map(|(time, ev)| (time.elapsed(), ev.clone()))
+                        last_net.as_ref().map(|(time, _ev)| time.elapsed())
                     };
-                    if let Some((elapsed, ev)) = elapsed_opt {
-                        if ev == EventType::Seek && elapsed < Duration::from_secs(2) {
+                    if let Some(elapsed) = elapsed_opt {
+                        if elapsed < Duration::from_secs(2) {
                             return;
                         }
                     }

@@ -82,6 +82,10 @@ impl SyncEngine {
                             let _ = session.set_playback_rate(1.0);
                         }
                     }
+                } else if event.event_type == EventType::Next {
+                    let _ = session.next();
+                } else if event.event_type == EventType::Previous {
+                    let _ = session.previous();
                 } else {
                     // Explicit commands (PLAY, PAUSE, SEEK): apply state + position changes
                     if target_playing != local_playing {
